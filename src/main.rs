@@ -54,6 +54,8 @@ enum Command {
     Doctor,
     /// Show current configuration
     Config,
+    /// Set up npusearch: create config and build first index
+    Init,
 }
 
 fn main() {
@@ -94,6 +96,9 @@ fn main() {
         Some(Command::Config) => {
             handle_config(&config);
         }
+        Some(Command::Init) => {
+            handle_init(&config);
+        }
         None => {
             if cli.query.is_empty() {
                 eprintln!("Usage: npusearch <query> or npusearch <command>");
@@ -103,7 +108,7 @@ fn main() {
 
             // Check if the first word looks like a misspelled subcommand
             let first = &cli.query[0];
-            let subcommands = ["index", "update", "doctor", "config"];
+            let subcommands = ["index", "update", "doctor", "config", "init"];
             if let Some(suggestion) = find_similar(first, &subcommands) {
                 eprintln!(
                     "Unknown subcommand '{}'. Did you mean '{}'?\n",
@@ -403,6 +408,78 @@ fn handle_refine(
 
     // Also print the config reminder to use --refine
     let _ = config;
+}
+
+fn handle_init(config: &Config) {
+    use std::io::{self, BufRead, Write};
+
+    println!("npusearch init");
+    println!("==============\n");
+
+    // 1. Create config file
+    let config_path = Config::config_path();
+    print!("Config file... ");
+    if config_path.exists() {
+        println!("already exists at {}", config_path.display());
+    } else {
+        if let Some(parent) = config_path.parent() {
+            std::fs::create_dir_all(parent).ok();
+        }
+        let example = include_str!("../config/config.example.toml");
+        match std::fs::write(&config_path, example) {
+            Ok(()) => println!("created at {}", config_path.display()),
+            Err(e) => println!("FAILED ({})", e),
+        }
+    }
+
+    // 2. Check API connectivity
+    println!();
+    let api_client = client::EmbeddingClient::new(&config.api);
+    print!("API endpoint ({})... ", config.api.endpoint);
+    match api_client.health_check() {
+        Ok(info) => {
+            println!("OK");
+            println!("  Model: {} ({}D)", info.model_id, info.dimensions);
+        }
+        Err(e) => {
+            println!("FAILED ({})", e);
+            println!("\nMake sure lemonade-server is running, then try again.");
+            println!("You can edit the config at: {}", config_path.display());
+            return;
+        }
+    }
+
+    // 3. Check for existing index
+    let data_path = index::Index::data_path();
+    println!();
+    if data_path.exists() {
+        if let Ok(idx) = index::Index::load(&data_path) {
+            println!("Index already exists: {} files indexed.", idx.entries.len());
+            print!("Re-index from scratch? [y/N] ");
+            io::stdout().flush().ok();
+            let mut answer = String::new();
+            io::stdin().lock().read_line(&mut answer).ok();
+            if !answer.trim().to_lowercase().starts_with('y') {
+                println!("\nSetup complete! Try: npusearch \"your search query\"");
+                return;
+            }
+        }
+    }
+
+    // 4. Offer to build first index
+    let root = config.index.root_path();
+    print!("Build first index of {}? [Y/n] ", root.display());
+    io::stdout().flush().ok();
+    let mut answer = String::new();
+    io::stdin().lock().read_line(&mut answer).ok();
+    if answer.trim().is_empty() || answer.trim().to_lowercase().starts_with('y') {
+        println!();
+        handle_index(config, false);
+    } else {
+        println!("\nSkipped. Run 'npusearch index' when ready.");
+    }
+
+    println!("\nSetup complete! Try: npusearch \"your search query\"");
 }
 
 fn handle_doctor(config: &Config) {

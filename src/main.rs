@@ -2,6 +2,7 @@ mod client;
 mod config;
 mod embed;
 mod index;
+mod interactive;
 mod search;
 mod walker;
 
@@ -101,9 +102,11 @@ fn main() {
         }
         None => {
             if cli.query.is_empty() {
-                eprintln!("Usage: npusearch <query> or npusearch <command>");
-                eprintln!("Run 'npusearch --help' for more information.");
-                std::process::exit(1);
+                if let Err(e) = interactive::run(&config) {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
+                return;
             }
 
             // Check if the first word looks like a misspelled subcommand

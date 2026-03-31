@@ -13,3 +13,4 @@ bincode = { version = "2", features = ["serde"] }
 toml = "0.8"
 dirs = "5"
 walkdir = "2"
+crossterm = "0.28"

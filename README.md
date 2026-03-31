@@ -19,7 +19,15 @@ Requires the Rust toolchain.
 
 ### Prebuilt binaries
 
-Coming soon via GitHub Releases.
+Download from [GitHub Releases](https://github.com/albiol2004/npusearch/releases):
+
+```bash
+curl -LO https://github.com/albiol2004/npusearch/releases/latest/download/npusearch-x86_64-unknown-linux-gnu
+chmod +x npusearch-x86_64-unknown-linux-gnu
+mv npusearch-x86_64-unknown-linux-gnu ~/.local/bin/npusearch
+```
+
+Available for x86_64 and aarch64 Linux.
 
 ### Shell completions
 

@@ -157,14 +157,38 @@ fn handle_index(config: &Config, dry_run: bool) {
         info.model_id, info.dimensions
     );
 
-    let results = embed::embed_files(&api_client, &config.api, files, &config.index);
+    // Try to resume from a partial index (previous interrupted run)
+    let data_path = index::Index::data_path();
+    let mut idx = if let Ok(existing) = index::Index::load(&data_path) {
+        let already = existing.entries.len();
+        if already > 0 {
+            eprintln!("Resuming from existing index ({} files already indexed).", already);
+        }
+        existing
+    } else {
+        index::Index::new(info.dimensions, info.model_id)
+    };
 
-    let mut idx = index::Index::new(info.dimensions, info.model_id);
-    for (path, entry) in results {
-        idx.entries.insert(path, entry);
+    // Filter out files already in the index with matching mtime
+    let files_to_embed: Vec<(PathBuf, u64)> = files
+        .into_iter()
+        .filter(|(path, mtime)| {
+            match idx.entries.get(path) {
+                Some(entry) if entry.mtime == *mtime => false, // already indexed
+                _ => true,
+            }
+        })
+        .collect();
+
+    eprintln!("{} files to embed.", files_to_embed.len());
+
+    if files_to_embed.is_empty() {
+        eprintln!("Index is already complete.");
+        return;
     }
 
-    let data_path = index::Index::data_path();
+    embed::embed_files(&api_client, &config.api, files_to_embed, &config.index, &mut idx);
+
     match idx.save(&data_path) {
         Ok(()) => {
             eprintln!(
@@ -260,11 +284,7 @@ fn handle_update(config: &Config) {
         }
     }
 
-    let results = embed::embed_files(&api_client, &config.api, to_embed, &config.index);
-
-    for (path, entry) in results {
-        idx.entries.insert(path, entry);
-    }
+    embed::embed_files(&api_client, &config.api, to_embed, &config.index, &mut idx);
 
     match idx.save(&data_path) {
         Ok(()) => {

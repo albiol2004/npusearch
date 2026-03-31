@@ -1,10 +1,13 @@
 use crate::client::EmbeddingClient;
 use crate::config::{ApiConfig, IndexConfig};
-use crate::index::FileEntry;
+use crate::index::{FileEntry, Index};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::Instant;
+
+/// How often to save a checkpoint (every N files).
+const CHECKPOINT_INTERVAL: usize = 500;
 
 /// Prepare the text to embed for a given file.
 /// Format: "{last 3 path components} | {first N chars of content}"
@@ -63,19 +66,22 @@ fn l2_normalize(v: &mut [f32]) {
 }
 
 /// Embed files using worker threads with progress reporting.
+/// Writes results directly into the index and checkpoints every 500 files.
 pub fn embed_files(
     client: &EmbeddingClient,
     api_config: &ApiConfig,
     files: Vec<(PathBuf, u64)>,
     config: &IndexConfig,
-) -> Vec<(PathBuf, FileEntry)> {
+    index: &mut Index,
+) {
     let total = files.len();
     if total == 0 {
-        return Vec::new();
+        return;
     }
 
     let workers = config.workers.max(1);
     let content_preview_bytes = config.content_preview_bytes;
+    let data_path = Index::data_path();
 
     // Channel for sending work items to workers
     let (work_tx, work_rx) = mpsc::channel::<(PathBuf, u64)>();
@@ -131,14 +137,17 @@ pub fn embed_files(
         // work_tx drops here, closing the channel
     });
 
-    // Collect results with progress reporting
-    let mut results = Vec::new();
+    // Collect results with progress reporting + periodic checkpointing
     let start = Instant::now();
+    let mut count = 0usize;
+    let mut since_checkpoint = 0usize;
 
     for (path, entry) in &result_rx {
-        results.push((path, entry));
-        let count = results.len();
+        index.entries.insert(path, entry);
+        count += 1;
+        since_checkpoint += 1;
 
+        // Progress display
         let elapsed = start.elapsed().as_secs_f64();
         let rate = count as f64 / elapsed;
         let remaining = if rate > 0.0 {
@@ -146,7 +155,6 @@ pub fn embed_files(
         } else {
             0
         };
-
         let mins = remaining / 60;
         let secs = remaining % 60;
         eprint!(
@@ -158,6 +166,14 @@ pub fn embed_files(
             secs,
         );
         let _ = std::io::stderr().flush();
+
+        // Checkpoint
+        if since_checkpoint >= CHECKPOINT_INTERVAL {
+            since_checkpoint = 0;
+            if let Err(e) = index.save(&data_path) {
+                eprintln!("\nWarning: checkpoint save failed: {}", e);
+            }
+        }
     }
     eprintln!();
 
@@ -166,6 +182,4 @@ pub fn embed_files(
     for handle in handles {
         let _ = handle.join();
     }
-
-    results
 }

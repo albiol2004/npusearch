@@ -26,10 +26,44 @@ const SKIP_DIRS: &[&str] = &[
     ".venv",
     "dist",
     "build",
+    // Heavy app-data dirs inside .config
+    "chromium",
+    "google-chrome",
+    "Code",
+    "Code - OSS",
+    "discord",
+    "Slack",
+    "spotify",
+    "BraveSoftware",
+    "session",
+    "sessions",
+    "Cache",
+    "CacheStorage",
+    "GPUCache",
+    "DawnGraphiteCache",
+    "DawnWebGPUCache",
+    "Service Worker",
+    "blob_storage",
+    "WebStorage",
+    "IndexedDB",
+    // IDE / editor state
+    "Cursor",
+    "VSCodium",
+    "Code - Insiders",
+    "CherryStudio",
+    "LM Studio",
+    // App data
+    "obsidian",
+    "calibre",
+    "Ryujinx",
+    "libreoffice",
+    // Claude Code internal state
+    "file-history",
+    "shell-snapshots",
 ];
 
 /// Hidden directories that should NOT be skipped.
-const ALLOWED_HIDDEN_DIRS: &[&str] = &[".config", ".ssh", ".claude"];
+const ALLOWED_HIDDEN_DIRS: &[&str] = &[".ssh", ".config"];
 
 /// Walk the file tree and return (path, mtime) pairs for indexable files.
 pub fn walk_files(root: &Path, config: &IndexConfig) -> Vec<(PathBuf, u64)> {

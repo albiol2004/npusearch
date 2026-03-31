@@ -131,12 +131,9 @@ impl EmbeddingClient {
             return Err(format!("API returned status {}", response.status()).into());
         }
 
-        let models: serde_json::Value = response.json()?;
-        let model_id = models["data"]
-            .get(0)
-            .and_then(|m| m["id"].as_str())
-            .unwrap_or(&self.model)
-            .to_string();
+        // Use the configured model name — /models may list multiple models
+        // and the first one isn't necessarily the embedding model
+        let model_id = self.model.clone();
 
         // Do a test embedding to get dimensions
         let test_embedding = self.embed("test")?;

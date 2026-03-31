@@ -57,6 +57,12 @@ enum Command {
     Config,
     /// Set up npusearch: create config and build first index
     Init,
+    /// Generate shell completions
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
 }
 
 fn main() {
@@ -100,6 +106,11 @@ fn main() {
         Some(Command::Init) => {
             handle_init(&config);
         }
+        Some(Command::Completions { shell: shell_type }) => {
+            use clap::CommandFactory;
+            let mut cmd = Cli::command();
+            clap_complete::generate(shell_type, &mut cmd, "npusearch", &mut std::io::stdout());
+        }
         None => {
             if cli.query.is_empty() {
                 if let Err(e) = interactive::run(&config) {
@@ -111,7 +122,7 @@ fn main() {
 
             // Check if the first word looks like a misspelled subcommand
             let first = &cli.query[0];
-            let subcommands = ["index", "update", "doctor", "config", "init"];
+            let subcommands = ["index", "update", "doctor", "config", "init", "completions"];
             if let Some(suggestion) = find_similar(first, &subcommands) {
                 eprintln!(
                     "Unknown subcommand '{}'. Did you mean '{}'?\n",
@@ -556,6 +567,32 @@ fn handle_doctor(config: &Config) {
             println!("NOT FOUND");
             println!("  Run 'npusearch index' to create an index.");
         }
+    }
+    println!();
+
+    // Check document extractors
+    println!("Document extractors");
+
+    print!("  pdftotext ... ");
+    match std::process::Command::new("pdftotext")
+        .arg("-v")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+    {
+        Ok(output) if output.status.success() => println!("OK (PDF support)"),
+        _ => println!("NOT FOUND (install poppler-utils for PDF support)"),
+    }
+
+    print!("  pandoc    ... ");
+    match std::process::Command::new("pandoc")
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+    {
+        Ok(output) if output.status.success() => println!("OK (docx/pptx/odt/epub support)"),
+        _ => println!("NOT FOUND (install for docx/pptx/odt/epub support)"),
     }
 }
 

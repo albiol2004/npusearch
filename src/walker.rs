@@ -4,10 +4,22 @@ use walkdir::WalkDir;
 
 /// Binary file extensions to skip.
 const BINARY_EXTENSIONS: &[&str] = &[
-    "o", "so", "pyc", "class", "jar", "zip", "tar", "gz", "png", "jpg", "jpeg", "gif", "bmp",
-    "ico", "webp", "mp3", "mp4", "avi", "mkv", "flac", "wav", "pdf", "doc", "docx", "xls",
-    "xlsx", "ppt", "pptx", "woff", "woff2", "ttf", "exe", "dll", "bin", "dat", "db", "sqlite",
+    // Compiled / object files
+    "o", "so", "pyc", "class", "jar", "exe", "dll", "bin",
+    // Archives (not documents)
+    "zip", "tar", "gz", "bz2", "xz", "7z", "rar",
+    // Images
+    "png", "jpg", "jpeg", "gif", "bmp", "ico", "webp", "svg", "tiff",
+    // Audio/video
+    "mp3", "mp4", "avi", "mkv", "flac", "wav", "ogg", "webm", "mov",
+    // Fonts
+    "woff", "woff2", "ttf", "eot", "otf",
+    // Disk images / packages
     "iso", "img", "dmg", "deb", "rpm", "snap", "flatpak", "AppImage",
+    // Data blobs
+    "dat", "db", "sqlite",
+    // NOTE: pdf, doc, docx, xls, xlsx, ppt, pptx are intentionally NOT here.
+    // They get indexed by filename/path (content is binary, but names are meaningful).
 ];
 
 /// Directories to always skip.

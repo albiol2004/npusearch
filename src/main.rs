@@ -362,9 +362,10 @@ fn handle_search_inner(config: &Config, query: &str) {
         }
     }
 
-    let results = search::search(
+    let results = search::search_hybrid(
         &idx,
         &query_embedding,
+        query,
         config.search.top_n,
         config.search.threshold,
     );

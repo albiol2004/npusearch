@@ -9,6 +9,12 @@ use std::time::Instant;
 /// How often to save a checkpoint (every N files).
 const CHECKPOINT_INTERVAL: usize = 500;
 
+/// Document extensions that need text extraction via external tools.
+const PDF_EXTENSIONS: &[&str] = &["pdf"];
+const PANDOC_EXTENSIONS: &[&str] = &[
+    "docx", "doc", "pptx", "odt", "odp", "ods", "epub", "rtf",
+];
+
 /// Prepare the text to embed for a given file.
 /// Format: "{last 3 path components} | {first N chars of content}"
 pub fn prepare_text(path: &Path, content_preview_bytes: usize) -> String {
@@ -23,7 +29,18 @@ pub fn prepare_text(path: &Path, content_preview_bytes: usize) -> String {
         components[components.len() - 3..].join(" ")
     };
 
-    // Try to read content preview
+    // Check if this is a document that needs text extraction
+    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        let ext_lower = ext.to_lowercase();
+        if let Some(text) = extract_document_text(path, &ext_lower, content_preview_bytes) {
+            if !text.is_empty() {
+                return format!("{} | {}", path_part, text);
+            }
+            return path_part;
+        }
+    }
+
+    // Regular text file: read directly
     if is_binary(path) {
         return path_part;
     }
@@ -32,7 +49,6 @@ pub fn prepare_text(path: &Path, content_preview_bytes: usize) -> String {
         Ok(bytes) => {
             let preview_len = content_preview_bytes.min(bytes.len());
             let text = String::from_utf8_lossy(&bytes[..preview_len]);
-            // Truncate at last word boundary
             let text = text.trim();
             if text.is_empty() {
                 path_part
@@ -42,6 +58,41 @@ pub fn prepare_text(path: &Path, content_preview_bytes: usize) -> String {
         }
         Err(_) => path_part,
     }
+}
+
+/// Extract text from document files using external tools.
+/// Returns Some(text) if the extension is a known document type, None otherwise.
+fn extract_document_text(path: &Path, ext: &str, max_bytes: usize) -> Option<String> {
+    use std::process::Command;
+
+    let output = if PDF_EXTENSIONS.contains(&ext) {
+        // pdftotext: extract first 2 pages to keep it fast
+        Command::new("pdftotext")
+            .args(["-l", "2", "-"])
+            .arg(path)
+            .output()
+            .ok()?
+    } else if PANDOC_EXTENSIONS.contains(&ext) {
+        Command::new("pandoc")
+            .args(["-t", "plain", "--wrap=none"])
+            .arg(path)
+            .output()
+            .ok()?
+    } else {
+        return None;
+    };
+
+    if !output.status.success() {
+        return Some(String::new()); // Known type but extraction failed — index path only
+    }
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    let truncated = if text.len() > max_bytes {
+        &text[..max_bytes]
+    } else {
+        &text
+    };
+    Some(truncated.trim().to_string())
 }
 
 /// Check if a file is binary by looking for null bytes in the first 512 bytes.

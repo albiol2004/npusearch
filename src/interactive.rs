@@ -159,7 +159,7 @@ pub fn run(config: &Config) -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            state.results = search::search(&idx, &query_embedding, top_n, threshold);
+            state.results = search::search_hybrid(&idx, &query_embedding, &state.query, top_n, threshold);
             state.selected = 0;
             state.searching = false;
             state.last_searched_query = state.query.clone();

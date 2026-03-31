@@ -1,0 +1,36 @@
+# npusearch configuration
+# Place this file at ~/.config/npusearch/config.toml
+
+[api]
+# Lemonade-server endpoint
+endpoint = "http://localhost:8000"
+# API path prefix (lemonade-server uses /api/v1)
+api_path = "/api/v1"
+# Embedding model name
+model = "embed-gemma-300m-FLM"
+# LLM model for --refine re-ranking
+llm_model = "default"
+# Request timeout in seconds
+timeout = 30
+
+[index]
+# Root directory to index
+root = "~"
+# Number of concurrent embedding workers
+workers = 4
+# Skip files larger than this (bytes)
+max_file_size = 1048576
+# Bytes of file content to include in embedding input
+content_preview_bytes = 500
+# Additional directories to skip (beyond built-in skip list)
+extra_skip_dirs = []
+
+[search]
+# Number of results to show
+top_n = 10
+# Minimum similarity score (0.0 - 1.0)
+threshold = 0.3
+# Use LLM to re-rank results by default
+refine = false
+# Auto-update index before search if older than this many hours (0 = disable)
+auto_update_hours = 24
